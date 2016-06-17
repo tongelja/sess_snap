@@ -1,1 +1,1 @@
-# Ora_session_snap
+# sess_snap
