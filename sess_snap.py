@@ -18,7 +18,6 @@
 
 import os, re, sys, getopt, operator, time, cx_Oracle, binascii, getpass
 sys.path.append(os.path.abspath('bin'))
-import orautility
 
 
 ##############################
@@ -88,7 +87,6 @@ def main():
         format = 'TRANSACTION,IO,WAIT,SQL_TEXT,LONGOP,STAT,EVENT,SQLMONITOR'
 
     
-    conn = orautility.createOraConnection(connect)
 
     my_snap = Session_Snap(conn, format)
     my_snap.getDbInfo()
