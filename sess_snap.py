@@ -86,8 +86,15 @@ def main():
     if format is None:
         format = 'TRANSACTION,IO,WAIT,SQL_TEXT,LONGOP,STAT,EVENT,SQLMONITOR'
 
-    
+   
+    db_user     = connect.split('@')[0].split('/')[0]
+    db_password = connect.split('@')[0].split('/')[1]
+    db_host     = connect.split('@')[1]
 
+    print('user=' + db_user + ' db_password=' + db_password + ' db_host=' + db_host)
+
+    conn = cx_Oracle.connect(user=db_user, password=db_password, dsn=db_host, mode=cx_Oracle.SYSDBA )
+ 
     my_snap = Session_Snap(conn, format)
     my_snap.getDbInfo()
 
