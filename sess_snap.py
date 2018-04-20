@@ -17,6 +17,7 @@
 #####################################
 
 import os, re, sys, getopt, operator, time, cx_Oracle, binascii, getpass
+from functools import reduce
 sys.path.append(os.path.abspath('bin'))
 
 
@@ -30,9 +31,9 @@ sys.path.append(os.path.abspath('bin'))
 ## usage
 ##
 def usage_exit(message):
-    print message
-    print "Usage:"
-    print os.path.abspath( __file__ ),  '\n \
+    print(message)
+    print("Usage:")
+    print(os.path.abspath( __file__ ),  '\n \
     Options: \n\n \
           -s ORACLE_SESSION_ID  \n \
              Session ID (SID) in Oracle \n\n \
@@ -50,7 +51,7 @@ def usage_exit(message):
                                LONGOP \n \
                                SEGSTAT \n \
                                LOCK \n \
-                               SQLMONITOR \n \n '
+                               SQLMONITOR \n \n ')
 
     sys.exit(2)
 
@@ -62,8 +63,8 @@ def usage_exit(message):
 def main():
     try:
         opts, args = getopt.getopt(sys.argv[1:], "c:s:f:")
-    except getopt.GetoptError, err:
-        print str(err)
+    except getopt.GetoptError as err:
+        print(str(err))
         usage_exit('getopt error:')
 
     connect    = None
@@ -84,9 +85,10 @@ def main():
         usage_exit('No Session ID specified')
 
     if format is None:
-        format = 'TRANSACTION,IO,WAIT,SQL_TEXT,LONGOP,STAT,EVENT,SQLMONITOR'
+        format = 'SQL_TEXT,IO,WAIT,LONGOP,STAT,EVENT,SQLMONITOR'
 
-   
+    
+
     db_user     = connect.split('@')[0].split('/')[0]
     db_password = connect.split('@')[0].split('/')[1]
     db_host     = connect.split('@')[1]
@@ -94,7 +96,7 @@ def main():
     print('user=' + db_user + ' db_password=' + db_password + ' db_host=' + db_host)
 
     conn = cx_Oracle.connect(user=db_user, password=db_password, dsn=db_host, mode=cx_Oracle.SYSDBA )
- 
+
     my_snap = Session_Snap(conn, format)
     my_snap.getDbInfo()
 
@@ -102,7 +104,7 @@ def main():
         try:
             my_snap.create_snapshot(SID)
         except KeyboardInterrupt:
-            print 'Exiting...'
+            print('Exiting...')
             sys.exit(0)
 
         
@@ -113,16 +115,30 @@ def max_length(a, b):
     else:           return b
     
 
-    
+   
+
+class color:
+    PURPLE = '\033[95m'
+    CYAN = '\033[96m'
+    DARKCYAN = '\033[36m'
+    BLUE = '\033[94m'
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    RED = '\033[91m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+    END = '\033[0m'
+
+ 
 class Session_Snap:
     def __init__(self, conn, display_items):
     
         self.delimiter                  = '-----------------------------'
-        self.column_format_01           = '%-45s %-2s'
-        self.column_format_02           = '%-60s %15s %20s'
-        self.column_format_03           = '%-60s %15.1f %15.1f %-4s'
-        self.column_format_04           = '%-80s'
-        self.column_format_05           = '%-20s'
+        self.column_format_01           = '{:<45} {:<2}'
+        self.column_format_02           = '{:<70} {:>15} {:>20}'
+        self.column_format_03           = '{:<70} {:>15} {:>15} {:<4}'
+        self.column_format_04           = '{:<80}'
+        self.column_format_05           = '{:<20}'
 
         self.sleep_time                 = 5
         self.db                         = conn
@@ -199,7 +215,7 @@ class Session_Snap:
         rows = cursor.fetchall()
     
         if rows[0][0] == 0:
-            print 'SID ' + str(SID) + ' does not exist.'
+            print('SID ' + str(SID) + ' does not exist.')
             sys.exit(2)
           
        
@@ -217,10 +233,10 @@ class Session_Snap:
     
         for i in range(start, len( s['event']['delta']) ):
             if i == start:
-                print '\n-- Events ' + self.delimiter
-                print header_format % ('Event', 'Delta', 'Rate')
+                print(color.BOLD + '\n-- Events ' + self.delimiter + color.END )
+                print(color.BOLD + header_format.format('Event', 'Delta', 'Rate') + color.END )
     
-            print line_format % (s['event']['delta'][i][0], s['event']['delta'][i][1], s['event']['delta'][i][1]/self.sleep_time, '/Sec' )
+            print(line_format.format(s['event']['delta'][i][0], format_number( s['event']['delta'][i][1] ), format_number( s['event']['delta'][i][1]/self.sleep_time), '/Sec' ))
     
    
     def print_segstat(self):
@@ -236,10 +252,10 @@ class Session_Snap:
 
         for i in range(start, len( s['segstat']['delta']) ):
             if i == start:
-                print '\n-- Segment Stats ' + self.delimiter
-                print header_format % ('Object - Statistic', 'Delta', 'Rate')
+                print(color.BOLD + '\n-- Segment Stats ' + self.delimiter + color.END )
+                print(color.BOLD + header_format.format('Object - Statistic', 'Delta', 'Rate') + color.END )
 
-            print line_format % (s['segstat']['delta'][i][0], s['segstat']['delta'][i][1], s['segstat']['delta'][i][1]/self.sleep_time, '/Sec' )
+            print(line_format.format(s['segstat']['delta'][i][0], format_number( s['segstat']['delta'][i][1] ), format_number( s['segstat']['delta'][i][1]/self.sleep_time ), '/Sec' ))
 
 
  
@@ -249,7 +265,7 @@ class Session_Snap:
             return
 
         s             = self.sess
-        line_format   = '%-4s %-' + str(s['sql_monitor']['max_op_length'] +5) + 's %-' + str(s['sql_monitor']['max_obj_length'] ) + 's %10s %6s %6s %10s %6s %6s %6s %6s  %6s %6s %6s  %4s %4s %5s'
+        line_format   = '{:<4} {:<' + str(s['sql_monitor']['max_op_length'] +5) + '} {:<' + str(s['sql_monitor']['max_obj_length'] ) + '} {:<10} {:<6} {:<6} {:<10} {:<6} {:<6} {:<6} {:<6}  {:<6} {:<6} {:<6}  {:<4} {:<4} {:<5}'
         num_rows      = self.print_lines['SQLMONITOR']
         start         = 0
 
@@ -279,14 +295,14 @@ class Session_Snap:
 
         for i in range(start, len( s['sql_monitor']['plan']) ):
             if i == start:
-                print '\n-- SQL Monitor ' + self.delimiter
-                print 'SQL ID           : ' + s['sql_monitor']['sql_id']
-                print 'Child Number     : ' + str(s['sql_monitor']['child_number'])
-                print 'Plan Hash Value  : ' + str(s['sql_monitor']['plan_hash_value'])
+                print(color.BOLD + '\n-- SQL Monitor ' + self.delimiter + color.END)
+                print('SQL ID           : ' + s['sql_monitor']['sql_id'])
+                print('Child Number     : ' + str(s['sql_monitor']['child_number']))
+                print('Plan Hash Value  : ' + str(s['sql_monitor']['plan_hash_value']) )
 
-                print line_format % (' ',  '         ', '      ', 'Est',  'Act',  ' ',   'Est IO', 'PhyRd', 'PhyWrt', 'PhyWrt', 'PhyRd', 'Est',  '',    '',     ' ',   ' ',    '')
-                print line_format % ('ID', 'Operation', 'Object', 'Rows', 'Rows', 'Exe', 'Cost',   'Req',   'Req',    'Bytes',  'Bytes', 'Temp', 'Mem', 'Temp', 'CPU%', 'IO%', '')
-                print line_format % ('--', '---------', '------', '----', '----', '---', '----',   '-----', '------', '------', '-----', '----', '---', '----', '----', '---', '')
+                print(color.BOLD + line_format.format(' ',  '         ', '      ', 'Est',  'Act',  ' ',   'Est IO', 'PhyRd', 'PhyWrt', 'PhyWrt', 'PhyRd', 'Est',  ' ',    ' ',     ' ',   ' ',    ' '))
+                print(line_format.format('ID', 'Operation', 'Object', 'Rows', 'Rows', 'Exe', 'Cost',   'Req',   'Req',    'Bytes',  'Bytes', 'Temp', 'Mem', 'Temp', 'CPU%', 'IO%', ' '))
+                print(line_format.format('--', '---------', '------', '----', '----', '---', '----',   '-----', '------', '------', '-----', '----', '---', '----', '----', '---', ' ') + color.END)
 
             if s['sql_monitor']['plan'][i]['sql_id'] != s['old_sql_monitor']['plan'][i]['sql_id']:
                 delta = ''
@@ -307,7 +323,7 @@ class Session_Snap:
                                     s['old_sql_monitor']['plan'][i]['workarea_tempseg']  
                 if current_activity != previous_activity:
                     #delta = '<<-- ' + "{0:.1f}".format(((current_activity-previous_activity)*100)/total_delta) + '%'
-                    delta = '<<-- ' + str(((current_activity-previous_activity)*100)/total_delta)   + '%'
+                    delta = '<<-- ' + str(round(((current_activity-previous_activity)*100)/total_delta))   + '%'
                 else:
                     delta = ''
 
@@ -315,19 +331,19 @@ class Session_Snap:
             #if num_lines < 30 and 1==2 :
             if 1==1 :
                 try:
-                    cpu_pct             = format_number( (s['sql_monitor']['plan'][i]['cpu_tm']*100)/s['sql_monitor']['delta_tm_01'] ) 
+                    cpu_pct             = format_number( round((s['sql_monitor']['plan'][i]['cpu_tm']*100)/s['sql_monitor']['delta_tm_01'])) 
                 except (ZeroDivisionError, TypeError):
                     cpu_pct            = ' '
                 try:
-                    db_pct              = format_number( (s['sql_monitor']['plan'][i]['db_tm']*100)/s['sql_monitor']['delta_tm_01'] )   
+                    db_pct              = format_number( round((s['sql_monitor']['plan'][i]['db_tm']*100)/s['sql_monitor']['delta_tm_01']) )   
                 except (ZeroDivisionError, TypeError):
                     db_pct             = ' '
                 try:
-                    total_io_bytes_pct  = format_number( ((int(s['sql_monitor']['plan'][i]['rd_io_bytes'])+int(s['sql_monitor']['plan'][i]['wr_io_bytes']))*100) / (int(s['sql_monitor']['total_io_bytes']))) 
+                    total_io_bytes_pct  = format_number( round( ((int(s['sql_monitor']['plan'][i]['rd_io_bytes'])+int(s['sql_monitor']['plan'][i]['wr_io_bytes']))*100) / (int(s['sql_monitor']['total_io_bytes'])) ) ) 
                 except (ZeroDivisionError, TypeError):
                     total_io_bytes_pct = ' '
                     
-                print line_format % (s['sql_monitor']['plan'][i]['plan_id'],
+                print(line_format.format(s['sql_monitor']['plan'][i]['plan_id'],
                                      s['sql_monitor']['plan'][i]['plan_operation'],
                                      s['sql_monitor']['plan'][i]['plan_object'],
                                      format_number(s['sql_monitor']['plan'][i]['plan_cardinality']),
@@ -343,10 +359,10 @@ class Session_Snap:
                                      format_number(s['sql_monitor']['plan'][i]['workarea_tempseg'], 1024), 
                                      cpu_pct,
                                      total_io_bytes_pct,
-                                     delta)
+                                     delta))
             else:
                 if delta != '':
-                    print line_format % (s['sql_monitor']['plan'][i]['plan_id'],
+                    print(line_format.format(s['sql_monitor']['plan'][i]['plan_id'],
                                          s['sql_monitor']['plan'][i]['plan_operation'],
                                          s['sql_monitor']['plan'][i]['plan_object'],
                                          format_number(s['sql_monitor']['plan'][i]['plan_cardinality']),
@@ -358,7 +374,7 @@ class Session_Snap:
                                          format_number(s['sql_monitor']['plan'][i]['plan_temp_space'], 1024),
                                          format_number(s['sql_monitor']['plan'][i]['workarea_mem'], 1024),
                                          format_number(s['sql_monitor']['plan'][i]['workarea_tempseg'], 1024),
-                                         delta)
+                                         delta))
 
 
  
@@ -376,10 +392,10 @@ class Session_Snap:
     
         for i in range(start, len( s['stat']['delta']) ):
             if i == start:
-                print '\n-- Statistics ' + self.delimiter
-                print header_format % ('Statistic', 'Delta', 'Rate')
+                print(color.BOLD + '\n-- Statistics ' + self.delimiter + color.END)
+                print(color.BOLD + header_format.format('Statistic', 'Delta', 'Rate') + color.END )
     
-            print line_format % (s['stat']['delta'][i][0], s['stat']['delta'][i][1], s['stat']['delta'][i][1]/self.sleep_time, '/Sec' )
+            print(line_format.format( s['stat']['delta'][i][0], format_number(s['stat']['delta'][i][1]), format_number(s['stat']['delta'][i][1]/self.sleep_time), '/Sec' ))
     
     
     
@@ -400,7 +416,7 @@ class Session_Snap:
 
         i            = 0
         line         = ''
-        stat_format  = '%-' + str( len( reduce(max_length, field_names.values()) )+2) + 's %-10s'
+        stat_format  = '{:<' + str( len( reduce(max_length, list(field_names.values())) )+2) + '} {:<10}'
         print_fields = [ 'cpu', 'pga_memory',
                          'physical_reads', 'logical_reads',
                          'hard_parses', 'soft_parses',
@@ -409,22 +425,22 @@ class Session_Snap:
         for j in print_fields:
 
             if i == 0:
-                print '\n-- Sess Metrics ' + self.delimiter
+                print(color.BOLD + '\n-- Sess Metrics ' + self.delimiter + color.END)
      
             if j is not None:
-                stat = stat_format % ( field_names[j] + ': ' , str(s['metric'][j]) )
+                stat = stat_format.format( field_names[j] + ': ' , str(s['metric'][j]) )
             else:
                 stat = ' '
 
-            line = line + line_format % ( stat, ' ' )
+            line = line + line_format.format( stat, ' ' )
     
             if (i+1)% columns  == 0:
-                print line
+                print(line)
                 line = ''
     
             if i == len( s['metric'] )  :
                 if (i+1)%columns > 0 :
-                    print line
+                    print(line)
             i = i + 1 
     
     
@@ -480,7 +496,7 @@ class Session_Snap:
             s['sess']['module']   = re.sub('\(.*', '', s['sess']['module'])
         except: 
             s['sess']['module']   = 'None'
-        s['sess']['host_name']    = s['sess']['host_name'].replace('.hq.navteq.com', '')
+        s['sess']['host_name']    = s['sess']['host_name'].split('.')[0]
         s['sess']['sid_serial']   = '(' + str( s['sess']['sid'] )  + ', ' + str( s['sess']['serial#'] ) + ')'
         s['sess']['saddr']        = binascii.hexlify(s['sess']['saddr']).upper()
         s['sess']['paddr']        = binascii.hexlify(s['sess']['paddr']).upper()
@@ -489,7 +505,7 @@ class Session_Snap:
 
         i            = 0
         line         = ''
-        stat_format  = '%-' + str( len( reduce(max_length, field_names.values()) )+2) + 's %-10s'
+        stat_format  = '{:<' + str( len( reduce(max_length, list(field_names.values())) )+2) + '} {:<10}'
         print_fields = ['sysdate', 'host_name', 'instance_name', 'current_scn',
                         'sid_serial', 'username', 'logon_time', 'last_call_et', 
                         'osuser', 'machine', 'module', 'sql_id', 
@@ -498,23 +514,23 @@ class Session_Snap:
 
         for j in print_fields:
             if i == 0:
-                print '\n-- Session ' + self.delimiter
+                print(color.BOLD + '\n-- Session ' + self.delimiter + color.END)
 
             if j is not None:
-                stat = stat_format % ( field_names[j] + ': ' , str(s['sess'][j]) )
+                stat = stat_format.format( field_names[j] + ': ' , str(s['sess'][j]) )
             else:
                 stat = ' '
 
-            line = line + line_format % ( stat, ' ' )
+            line = line + line_format.format( stat, ' ' )
 
 
             if (i+1)% columns  == 0:
-                print line
+                print(line)
                 line = ''
 
             if i == len( print_fields ) -1 :
                 if (i+1)%columns > 0 :
-                    print line
+                    print(line)
 
             i = i + 1
 
@@ -534,16 +550,16 @@ class Session_Snap:
        
         for i in range(start, end):
             if i == 0:
-                print '\n-- Locks ' + self.delimiter
+                print('\n-- Locks ' + self.delimiter)
                 for j in print_header:
-                    line = line + line_format % ( j )
-                print line
+                    line = line + line_format.format( j )
+                print(line)
                 line = ''
 
                 
             for j in print_fields:
-                line = line + line_format % ( s['lock'][i][j] )
-            print line
+                line = line + line_format.format( s['lock'][i][j] )
+            print(line)
             line = ''
     
     def print_wait(self):
@@ -564,13 +580,13 @@ class Session_Snap:
             ptext = ptext + ', ' + s['wait']['p3text'] + '=' + str(s['wait']['p3'])
     
     
-        print '\n-- Wait Event ' + self.delimiter
-        print line_format % ( 'Event:  ' + s['wait']['event'] )
-        print line_format % ( 'PText:  ' +  ptext )
-        print line_format % ( 'State:  ' +  wait_state )
+        print(color.BOLD + '\n-- Wait Event ' + self.delimiter + color.END )
+        print(line_format.format( 'Event:  ' + s['wait']['event'] ))
+        print(line_format.format( 'PText:  ' +  ptext ))
+        print(line_format.format( 'State:  ' +  wait_state ))
     
         if s['wait']['blocking_session'] != None:
-            print line_format % ('Blocker:  ' +  'SID=' + str(s['wait']['blocking_session']) + ', Obj#=' + str(s['wait']['row_wait_obj#']) )
+            print(line_format.format('Blocker:  ' +  'SID=' + str(s['wait']['blocking_session']) + ', Obj#=' + str(s['wait']['row_wait_obj#']) ))
     
     
        
@@ -608,7 +624,7 @@ class Session_Snap:
 
         i            = 0
         line         = ''
-        stat_format  = '%-' + str( len( reduce(max_length, field_names.values()) )+2) + 's %-10s'
+        stat_format  = '{:<' + str( len( reduce(max_length, list(field_names.values())) )+2) + '} {:<10}'
         print_fields = ['Xidusn', 'Xidslot', 'Xidsqn', None,
                         'Ubafil', 'Ubablk', 'Ubasqn', 'Ubarec',
                         'Start_Ubafil', 'Start_Ubablk', 'Start_Ubasqn', 'Start_Ubarec',
@@ -618,23 +634,23 @@ class Session_Snap:
 
         for j in print_fields:
             if i == 0:
-                print '\n-- Transaction ' + self.delimiter
+                print(color.BOLD + '\n-- Transaction ' + self.delimiter + color.END)
    
             if j is not None:
-                stat = stat_format % ( field_names[j] + ': ' , str(s['trans'][j]) )
+                stat = stat_format.format( field_names[j] + ': ' , str(s['trans'][j]) )
             else:
                 stat = ' '
 
-            line = line + line_format % ( stat, ' ' )
+            line = line + line_format.format( stat, ' ' )
  
     
             if (i+1)% columns  == 0:
-                print line
+                print(line)
                 line = ''
     
             if i == len( print_fields ) -1 :
                 if (i+1)%columns > 0 :
-                    print line
+                    print(line)
     
             i = i + 1
     
@@ -650,19 +666,17 @@ class Session_Snap:
             end = lines
         else:
             end = len(s['sql_text'])
-    
-        for i in range(start, end ) :
-            if i == 0:
-                print ''
-                print '-- SQL Text (' + str(s['sess']['sql_id']) + ') ' + self.delimiter
-                print s['sql_text'][int(i)].strip()
 
-            else:
-                try:
-                    print '    ' + s['sql_text'][int(i)].strip()
-                except:
-                    print ' '
-    
+
+        print('')
+        print(color.BOLD + '-- SQL Text (' + str(s['sess']['sql_id']) + ') ' + self.delimiter + color.END)
+
+        for i in range(start, end ):
+            try:
+                print('    ' + s['sql_text'][int(i)].strip())
+            except:
+                print(' ')
+
     
     def print_io(self):
         s           = self.sess
@@ -681,28 +695,28 @@ class Session_Snap:
                       }
     
         i            = 0
-        stat_format  = '%-' + str( len( reduce(max_length, field_names.values()) )+2) + 's %-10s'
+        stat_format  = '{:<' + str( len( reduce(max_length, list(field_names.values())) )+2) + '} {:<10}'
         print_fields = ['block_gets', 'consistent_gets', 'physical_reads', 'block_changes', 'consistent_changes']
 
         for j in print_fields:
             if i == 0:
-                print ''
-                print '-- Sess I/O ' + self.delimiter
+                print('')
+                print(color.BOLD + '-- Sess I/O ' + self.delimiter + color.END)
     
             if j is not None:
-                stat = stat_format % ( field_names[j] + ': ' , str(s['io'][j]) )
+                stat = stat_format.format( field_names[j] + ': ' , str(s['io'][j]) )
             else:
                 stat = ' '
 
-            line = line + line_format % ( stat, ' ' )
+            line = line + line_format.format( stat, ' ' )
  
             if (i+1)% columns  == 0:
-                print line
+                print(line)
                 line = ''
     
             if i == len(field_names) -1  :
                 if (i+1)% columns > 0 :
-                    print line
+                    print(line)
     
             i = i + 1
     
@@ -726,31 +740,31 @@ class Session_Snap:
     
         s['proc']['program'] = s['proc']['program'].replace('.hq.navteq.com', '')
 
-        stat_format  = '%-' + str( len( reduce(max_length, field_names.values()) )+2) + 's %-10s'
+        stat_format  = '{:<' + str( len( reduce(max_length, list(field_names.values())) )+2) + '} {:<10}'
         print_fields = [ 'pid', 'spid', 'program', 'traceid', 'latchwait', 'latchspin', 'pga_used_mem', 'pga_alloc_mem' ]
         line         = ''
         i            = 0
 
         for j in print_fields:
             if i == 0:
-                print ''
-                print '-- Process ' + self.delimiter
+                print('')
+                print(color.BOLD  + '-- Process ' + self.delimiter + color.END)
 
             if j is not None:
-                stat = stat_format % ( field_names[j] + ': ' , str(s['proc'][j]) )
+                stat = stat_format.format( field_names[j] + ': ' , str(s['proc'][j]) )
             else:
                 stat = ' '
 
-            line = line + line_format % ( stat, ' ' )
+            line = line + line_format.format( stat, ' ' )
     
     
             if (i+1)% columns  == 0:
-                print line
+                print(line)
                 line = ''
     
             if i == len(field_names) -1  :
                 if (i+1)% columns > 0 :
-                    print line
+                    print(line)
     
             i = i + 1
       
@@ -779,31 +793,31 @@ class Session_Snap:
         s['sess_longop']['work'] = str(s['sess_longop']['sofar']) + '/' + str(s['sess_longop']['totalwork']) + ' ' + s['sess_longop']['units']
         s['sess_longop']['time_remaining'] = str(s['sess_longop']['time_remaining']) + ' sec.'
  
-        stat_format  = '%-' + str( len( reduce(max_length, field_names.values()) )+2) + 's %-10s'
+        stat_format  = '{:<' + str( len( reduce(max_length, list(field_names.values())) )+2) + '} {:<10}'
         print_fields = [ 'sid', 'opname', 'target', 'work', 'time_remaining', 'sql_id' ]
         line         = ''
         i            = 0
 
         for j in print_fields:
             if i == 0:
-                print ''
-                print '-- Sess. LongOps ' + self.delimiter
+                print('')
+                print(color.BOLD + '-- Sess. LongOps ' + self.delimiter + color.END)
 
             if j is not None:
-                stat = stat_format % ( field_names[j] + ': ' , str(s['sess_longop'][j]) )
+                stat = stat_format.format( field_names[j] + ': ' , str(s['sess_longop'][j]) )
             else:
                 stat = ' '
 
-            line = line + line_format % ( stat, ' ' )
+            line = line + line_format.format( stat, ' ' )
    
    
             if (i+1)% columns  == 0:
-                print line
+                print(line)
                 line = ''
    
             if i == len(field_names) -1  :
                 if (i+1)% columns > 0 :
-                    print line
+                    print(line)
    
             i = i + 1
 
@@ -1230,7 +1244,7 @@ class Session_Snap:
                 if delta > 0:
                     d[ self.sess['stat']['run_data'][rows[i][1]]['name'] ] = self.sess['stat']['run_data'][rows[i][1]]['delta']
     
-            l = sorted(d.iteritems(), key=operator.itemgetter(1))
+            l = sorted(iter(d.items()), key=operator.itemgetter(1))
             self.sess['stat']['delta'] = l
     
     
@@ -1272,7 +1286,7 @@ class Session_Snap:
                 if delta > 0:
                     d[ self.sess['event']['run_data'][rows[i][1]]['name'] ] = self.sess['event']['run_data'][rows[i][1]]['delta']
     
-            l = sorted(d.iteritems(), key=operator.itemgetter(1))
+            l = sorted(iter(d.items()), key=operator.itemgetter(1))
             self.sess['event']['delta']=l
 
     def segstat_snapshot(self, run, SID):
@@ -1313,7 +1327,7 @@ class Session_Snap:
                 if delta > 0:
                     d[ self.sess['segstat']['run_data'][rows[i][1]]['name'] ] = self.sess['segstat']['run_data'][rows[i][1]]['delta']
 
-            l = sorted(d.iteritems(), key=operator.itemgetter(1))
+            l = sorted(iter(d.items()), key=operator.itemgetter(1))
             self.sess['segstat']['delta']=l
 
 
@@ -1334,15 +1348,15 @@ def format_number(n, unit=1000):
     length = len(str(n))
 
     if length > 13:
-        return str(n/unit/unit/unit/unit) + 'P'
+        return str(round(n/unit/unit/unit/unit)) + 'P'
     elif length > 10:
-        return str(n/unit/unit/unit) + 'G'
+        return str(round(n/unit/unit/unit)) + 'G'
     elif length > 7:
-        return str(n/unit/unit) + 'M'
+        return str(round(n/unit/unit)) + 'M'
     elif length > 4:
-        return str(n/unit) + 'K'
+        return str(round(n/unit)) + 'K'
     else:
-        return str(n)
+        return str(round(n))
 
 
 
