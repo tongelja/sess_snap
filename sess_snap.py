@@ -38,7 +38,7 @@ def usage_exit(message):
           -s ORACLE_SESSION_ID  \n \
              Session ID (SID) in Oracle \n\n \
         [ -c CONNECTION_STRING ] \n \
-             Connection String Format:  SID:Hostname[User:Password:Port] \n\n \
+             Connection String Format:  User/Password@Host/DB  \n\n \
         [ -f SNAPSHOT[:LINES],... ] \n \
              Snapshot Options: TRANSACTION \n \
                                METRIC \n \
