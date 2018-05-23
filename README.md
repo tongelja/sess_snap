@@ -24,7 +24,7 @@ You will need to have cx_Oracle installed.
 Run SessSnap with python2 (python3 update coming soon) and pass your connection information and you session ID.
 
 ```
-python sesssnap.py -s 1011 -c mydb001:myserver00001:sys;mysyspassword
+python sesssnap.py -s 1011 -c sys/password@SERVER/DB
 ```
 
 Your output will refresh every few seconds and look like this:
